@@ -39,9 +39,7 @@ def test_message_type_enum():
 
 def test_message_content_creation():
     """Test LanguageModelMessageContent creation and serialization."""
-    content = LanguageModelMessageContent(
-        type=LanguageModelMessageType.TEXT, value="Hello, world!"
-    )
+    content = LanguageModelMessageContent(type=LanguageModelMessageType.TEXT, value="Hello, world!")
     assert content.type == LanguageModelMessageType.TEXT
     assert content.value == "Hello, world!"
 
@@ -52,9 +50,7 @@ def test_message_content_creation():
 
 def test_message_creation_with_string():
     """Test LanguageModelMessage creation with string content."""
-    message = LanguageModelMessage(
-        role=LanguageModelMessageRole.USER, content="Test message"
-    )
+    message = LanguageModelMessage(role=LanguageModelMessageRole.USER, content="Test message")
     assert message.role == LanguageModelMessageRole.USER
     assert message.content == "Test message"
     assert message.prefix is False
@@ -67,12 +63,8 @@ def test_message_creation_with_string():
 
 def test_message_creation_with_content_list():
     """Test LanguageModelMessage creation with content list."""
-    content1 = LanguageModelMessageContent(
-        type=LanguageModelMessageType.TEXT, value="Hello"
-    )
-    content2 = LanguageModelMessageContent(
-        type=LanguageModelMessageType.TEXT, value="World"
-    )
+    content1 = LanguageModelMessageContent(type=LanguageModelMessageType.TEXT, value="Hello")
+    content2 = LanguageModelMessageContent(type=LanguageModelMessageType.TEXT, value="World")
     message = LanguageModelMessage(
         role=LanguageModelMessageRole.ASSISTANT, content=[content1, content2]
     )
@@ -89,9 +81,7 @@ def test_message_creation_with_content_list():
 
 def test_expected_creation():
     """Test LanguageModelExpected creation and serialization."""
-    expected = LanguageModelExpected(
-        type=LanguageModelMessageType.TEXT, languages=["en", "es"]
-    )
+    expected = LanguageModelExpected(type=LanguageModelMessageType.TEXT, languages=["en", "es"])
     assert expected.type == LanguageModelMessageType.TEXT
     assert expected.languages == ["en", "es"]
 

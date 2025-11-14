@@ -58,14 +58,16 @@ async def streaming_prompt():
 async def system_prompt_example():
     """System prompt example."""
     print("\nSystem prompt example...")
-    session = await LanguageModel.create({
-        "initialPrompts": [
-            {
-                "role": "system",
-                "content": "You are a helpful Python programming assistant who gives concise answers."
-            }
-        ]
-    })
+    session = await LanguageModel.create(
+        {
+            "initialPrompts": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful Python programming assistant who gives concise answers.",
+                }
+            ]
+        }
+    )
 
     result = await session.prompt("How do I read a file in Python?")
     print(f"Response: {result}")
@@ -76,14 +78,9 @@ async def system_prompt_example():
 async def conversation_example():
     """Multi-turn conversation example."""
     print("\nConversation example...")
-    session = await LanguageModel.create({
-        "initialPrompts": [
-            {
-                "role": "system",
-                "content": "You are a friendly assistant."
-            }
-        ]
-    })
+    session = await LanguageModel.create(
+        {"initialPrompts": [{"role": "system", "content": "You are a friendly assistant."}]}
+    )
 
     # First message
     result1 = await session.prompt("What's the weather like today?")
@@ -121,14 +118,9 @@ async def measure_usage_example():
 async def session_cloning_example():
     """Example of session cloning."""
     print("\nSession cloning example...")
-    session = await LanguageModel.create({
-        "initialPrompts": [
-            {
-                "role": "system",
-                "content": "You are a creative storyteller."
-            }
-        ]
-    })
+    session = await LanguageModel.create(
+        {"initialPrompts": [{"role": "system", "content": "You are a creative storyteller."}]}
+    )
 
     # Initial prompt
     await session.prompt("Once upon a time, there was a dragon.")
@@ -157,21 +149,14 @@ async def structured_output_example():
         "type": "object",
         "required": ["sentiment", "score"],
         "properties": {
-            "sentiment": {
-                "type": "string",
-                "enum": ["positive", "negative", "neutral"]
-            },
-            "score": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
-            }
-        }
+            "sentiment": {"type": "string", "enum": ["positive", "negative", "neutral"]},
+            "score": {"type": "number", "minimum": 0, "maximum": 1},
+        },
     }
 
     result = await session.prompt(
         "Analyze this review: The product was amazing, exceeded all expectations!",
-        {"responseConstraint": schema}
+        {"responseConstraint": schema},
     )
     print(f"Structured response: {result}")
 
@@ -215,6 +200,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 
