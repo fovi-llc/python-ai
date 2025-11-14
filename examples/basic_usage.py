@@ -1,12 +1,12 @@
 """
-Basic usage examples for python-ai.
+Basic usage examples for wiki3-ai.
 
 This file demonstrates the core functionality of the Python wrapper
 for Chrome's Prompt API.
 """
 
 import asyncio
-from python_ai import LanguageModel, Availability
+from wiki3_ai import LanguageModel, Availability
 
 
 async def check_availability():

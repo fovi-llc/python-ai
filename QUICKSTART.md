@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get started with python-ai in 5 minutes!
+Get started with wiki3-ai in 5 minutes!
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Get started with python-ai in 5 minutes!
 ## Installation
 
 ```bash
-pip install python-ai
+pip install wiki3-ai
 ```
 
 ## Your First Prompt
@@ -23,7 +23,7 @@ pip install python-ai
 Open a Jupyter notebook in Chrome and run:
 
 ```python
-from python_ai import LanguageModel
+from wiki3_ai import LanguageModel
 
 # Create a session
 session = await LanguageModel.create()
@@ -42,7 +42,7 @@ That's it! You're now using Chrome's built-in AI.
 Always check if the API is available:
 
 ```python
-from python_ai import LanguageModel, Availability
+from wiki3_ai import LanguageModel, Availability
 
 availability = await LanguageModel.availability()
 

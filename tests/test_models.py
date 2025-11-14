@@ -1,7 +1,7 @@
 """Tests for data models."""
 
 import pytest
-from python_ai.models import (
+from wiki3_ai.models import (
     Availability,
     LanguageModelMessage,
     LanguageModelMessageContent,

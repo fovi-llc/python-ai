@@ -1,4 +1,4 @@
-# python-ai
+# wiki3-ai
 
 Python wrapper for Chrome's built-in AI Prompt API, enabling direct access to browser-provided language models from Jupyter notebooks.
 
@@ -17,7 +17,7 @@ Python wrapper for Chrome's built-in AI Prompt API, enabling direct access to br
 ## Installation
 
 ```bash
-pip install python-ai
+pip install wiki3-ai
 ```
 
 ## Requirements
@@ -29,7 +29,7 @@ pip install python-ai
 ## Quick Start
 
 ```python
-from python_ai import LanguageModel
+from wiki3_ai import LanguageModel
 
 # Create a language model session
 session = await LanguageModel.create()
@@ -48,7 +48,7 @@ async for chunk in session.prompt_streaming("Write me a long story."):
 ### System Prompts
 
 ```python
-from python_ai import LanguageModel, LanguageModelMessage, LanguageModelMessageRole
+from wiki3_ai import LanguageModel, LanguageModelMessage, LanguageModelMessageRole
 
 session = await LanguageModel.create({
     "initialPrompts": [
@@ -66,7 +66,7 @@ print(response)
 ### Checking Availability
 
 ```python
-from python_ai import LanguageModel, Availability
+from wiki3_ai import LanguageModel, Availability
 
 # Check if the API is available
 availability = await LanguageModel.availability()

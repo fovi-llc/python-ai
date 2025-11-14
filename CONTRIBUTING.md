@@ -1,6 +1,6 @@
-# Contributing to python-ai
+# Contributing to wiki3-ai
 
-Thank you for your interest in contributing to python-ai! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to wiki3-ai! This document provides guidelines for contributing to the project.
 
 ## Code of Conduct
 
@@ -49,8 +49,8 @@ We use:
 
 Format your code:
 ```bash
-black python_ai tests examples
-ruff check python_ai tests examples --fix
+black wiki3_ai tests examples
+ruff check wiki3_ai tests examples --fix
 ```
 
 ### 4. Run Tests
@@ -133,7 +133,7 @@ Key principles:
 
 ```
 python-ai/
-├── python_ai/             # Main package
+├── wiki3_ai/             # Main package
 │   ├── __init__.py        # Package exports
 │   ├── models.py          # Data models
 │   └── language_model.py  # Main implementation
@@ -161,7 +161,7 @@ pytest tests/ -v
 pytest tests/test_models.py -v
 
 # With coverage
-pytest tests/ --cov=python_ai
+pytest tests/ --cov=wiki3_ai
 ```
 
 ## Documentation

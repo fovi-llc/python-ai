@@ -251,7 +251,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
     @traitlets.observe("response")
     def _handle_response(self, change):
         """Handle response from JavaScript."""
-        print('Handling response: ', change)
+        print("Handling response: ", change)
         response = change["new"]
         if not response or "id" not in response:
             return
@@ -274,7 +274,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
     @traitlets.observe("error")
     def _handle_error(self, change):
         """Handle error from JavaScript."""
-        print('Handling error: ', change)
+        print("Handling error: ", change)
         error = change["new"]
         if error and error.get("message"):
             # Global error not tied to a specific request
@@ -295,18 +295,18 @@ class LanguageModelWidget(anywidget.AnyWidget):
     async def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
         """Send a request to JavaScript and await response."""
         request_id = str(uuid.uuid4())
-        print('Sending request ID: ', request_id)
+        print("Sending request ID: ", request_id)
         future = asyncio.Future()
         self._pending_requests[request_id] = future
 
         self.request = {"id": request_id, "method": method, "params": params or {}}
-        print('Sent request: ', self.request)
+        print("Sent request: ", self.request)
 
         # Yield control to allow the event loop to process traitlet updates
         # This is necessary for the JavaScript response to be received and processed
         while not future.done():
             await asyncio.sleep(0)
-        
+
         return await future
 
 
@@ -336,7 +336,7 @@ class LanguageModel:
 
         params = {"sessionId": session_id, "options": options_dict}
         result = await self.widget.send_request("create", params)
-        print('Created session result: ', result)
+        print("Created session result: ", result)
 
         self._session_id = session_id
         self._top_k = result.get("topK")
@@ -487,7 +487,7 @@ class LanguageModel:
     def session_id(self) -> Optional[str]:
         """Current session ID."""
         return self._session_id
-    
+
     @property
     def input_usage(self) -> float:
         """Current input usage in tokens."""

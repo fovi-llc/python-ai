@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "python-ai"
+name = "wiki3-ai"
 version = "0.1.0"
 description = "Python wrapper for Chrome's built-in AI Prompt API"
 readme = "README.md"
@@ -48,7 +48,7 @@ Repository = "https://github.com/fovi-llc/python-ai"
 Issues = "https://github.com/fovi-llc/python-ai/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["python_ai"]
+packages = ["wiki3_ai"]
 
 [tool.black]
 line-length = 100

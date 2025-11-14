@@ -1,14 +1,14 @@
 # Architecture
 
-This document describes the architecture of the python-ai package.
+This document describes the architecture of the wiki3-ai package.
 
 ## Overview
 
-python-ai is a Python wrapper for Chrome's built-in AI Prompt API that enables seamless access to browser-provided language models from Jupyter notebooks. The implementation uses minimal code and directly maps to the Web IDL specifications.
+wiki3-ai is a Python wrapper for Chrome's built-in AI Prompt API that enables seamless access to browser-provided language models from Jupyter notebooks. The implementation uses minimal code and directly maps to the Web IDL specifications.
 
 ## Components
 
-### 1. Data Models (`python_ai/models.py`)
+### 1. Data Models (`wiki3_ai/models.py`)
 
 Pure Python dataclasses that mirror the IDL specification:
 
@@ -22,7 +22,7 @@ Each model includes:
 - `to_dict()` methods for serialization to JavaScript
 - `from_dict()` methods for deserialization from JavaScript (where applicable)
 
-### 2. Language Model (`python_ai/language_model.py`)
+### 2. Language Model (`wiki3_ai/language_model.py`)
 
 #### LanguageModelWidget (AnyWidget)
 

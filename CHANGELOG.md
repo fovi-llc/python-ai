@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-11-13
 
 ### Added
-- Initial release of python-ai
+- Initial release of wiki3-ai
 - Full implementation of Chrome Prompt API wrapper
 - AnyWidget integration for Jupyter notebooks
 - Traitlets-based bidirectional communication
