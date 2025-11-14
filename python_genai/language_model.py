@@ -291,7 +291,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
             self._stream_chunks[request_id] = []
         self._stream_chunks[request_id].append(chunk_data["chunk"])
 
-    def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
         """Send a request to JavaScript and await response."""
         request_id = str(uuid.uuid4())
         print('Sending request ID: ', request_id)
@@ -301,7 +301,12 @@ class LanguageModelWidget(anywidget.AnyWidget):
         self.request = {"id": request_id, "method": method, "params": params or {}}
         print('Sent request: ', self.request)
 
-        return future
+        # Yield control to allow the event loop to process traitlet updates
+        # This is necessary for the JavaScript response to be received and processed
+        while not future.done():
+            await asyncio.sleep(0)
+        
+        return await future
 
 
 class LanguageModel:
