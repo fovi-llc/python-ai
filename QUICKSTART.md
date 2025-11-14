@@ -10,7 +10,7 @@ Get started with python-genai in 5 minutes!
 
 2. **Jupyter Environment**: JupyterLab, Jupyter Notebook, or Google Colab
 
-3. **Python 3.8+**
+3. **Python 3.10+**
 
 ## Installation
 

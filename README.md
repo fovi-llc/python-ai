@@ -22,7 +22,7 @@ pip install python-genai
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+
 - Chrome browser with Prompt API enabled
 - Running in a Jupyter environment (JupyterLab, Jupyter Notebook, etc.)
 

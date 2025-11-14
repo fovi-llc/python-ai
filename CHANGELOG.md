@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All tests passing
 - CI/CD:
   - GitHub Actions workflow for testing
-  - Support for Python 3.8-3.12
+  - Support for Python 3.10-3.12
 
 ### Security
 - No vulnerabilities in dependencies
