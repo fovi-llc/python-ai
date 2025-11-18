@@ -164,11 +164,12 @@ class LanguageModelWidget(anywidget.AnyWidget):
             for await (const chunk of stream) {
                 console.log('chunk: ', chunk);
                 chunks.push(chunk);
-                // Send intermediate chunks back
+                // Send intermediate chunks back - use timestamp to ensure uniqueness
                 model.set('stream_chunk', {
                     sessionId: sessionId,
                     requestId: requestId,
                     chunk: chunk,
+                    timestamp: Date.now()
                 });
                 model.save_changes();
             }
@@ -247,20 +248,27 @@ class LanguageModelWidget(anywidget.AnyWidget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._pending_requests: Dict[str, asyncio.Future] = {}
-        self._stream_chunks: Dict[str, List[str]] = {}
-        # self.observe(self._handle_response, names=["response"])
-        # self.observe(self._handle_error, names=["error"])
-        # self.observe(self._handle_stream_chunk, names=["stream_chunk"])
+        self._stream_chunks: Dict[str, asyncio.Queue] = {}
+        self._stream_request_mapping: Dict[str, str] = {}  # maps main request_id to stream request_id
 
     @traitlets.observe("response")
     def _handle_response(self, change):
         """Handle response from JavaScript."""
-        # print("Handling response: ", change)
         response = change["new"]
         if not response or "id" not in response:
             return
 
         request_id = response["id"]
+        
+        # Check if this is a streaming request and signal completion
+        if request_id in self._stream_request_mapping:
+            stream_request_id = self._stream_request_mapping[request_id]
+            if stream_request_id in self._stream_chunks:
+                try:
+                    self._stream_chunks[stream_request_id].put_nowait(None)
+                except:
+                    pass
+        
         if request_id in self._pending_requests:
             future = self._pending_requests.pop(request_id)
             if response.get("error"):
@@ -287,16 +295,19 @@ class LanguageModelWidget(anywidget.AnyWidget):
     @traitlets.observe("stream_chunk")
     def _handle_stream_chunk(self, change):
         """Handle streaming chunk from JavaScript."""
-        print("change: ", change)
         chunk_data = change["new"]
         if not chunk_data or "requestId" not in chunk_data:
-            log.warning("Invalid chunk data received: ", chunk_data)
             return
 
         request_id = chunk_data["requestId"]
-        if request_id not in self._stream_chunks:
-            self._stream_chunks[request_id] = []
-        self._stream_chunks[request_id].append(chunk_data["chunk"])
+        if request_id in self._stream_chunks:
+            # Put chunk into the queue without blocking
+            try:
+                self._stream_chunks[request_id].put_nowait(chunk_data["chunk"])
+            except asyncio.QueueFull:
+                print(f"Warning: Stream queue full for request {request_id}")
+        else:
+            print(f"Warning: Received chunk for unknown request ID: {request_id}")
 
     def wait_for_change(self, value):
         future = asyncio.Future()
@@ -415,7 +426,9 @@ class LanguageModel:
         input_data = self._prepare_input(input)
 
         request_id = str(uuid.uuid4())
-        self.widget()._stream_chunks[request_id] = []
+        # Create a queue for this streaming request BEFORE starting the request
+        queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+        self.widget()._stream_chunks[request_id] = queue
 
         params = {
             "sessionId": self.session_id,
@@ -424,30 +437,36 @@ class LanguageModel:
             "options": options,
         }
 
-        # Start the request
-        asyncio.create_task(self.widget().send_request("promptStreaming", params))
+        # Start the request - capture the main request ID for mapping
+        async def _send():
+            main_request_id = str(uuid.uuid4())
+            self.widget()._stream_request_mapping[main_request_id] = request_id
+            return await self.widget().send_request("promptStreaming", params)
+        
+        request_task = asyncio.create_task(_send())
 
-        # Yield chunks as they arrive
-        chunk_index = 0
-        while True:
-            chunks = self.widget()._stream_chunks.get(request_id, [])
-            if chunk_index < len(chunks):
-                yield chunks[chunk_index]
-                chunk_index += 1
-            else:
-                # Check if the request is complete
-                await asyncio.sleep(0.1)
-                if request_id not in self.widget()._pending_requests:
-                    # Request completed, yield remaining chunks
-                    chunks = self.widget()._stream_chunks.get(request_id, [])
-                    while chunk_index < len(chunks):
-                        yield chunks[chunk_index]
-                        chunk_index += 1
+        try:
+            # Yield chunks as they arrive
+            while True:
+                chunk = await queue.get()
+                if chunk is None:
+                    # Stream completed
                     break
-
-        # Clean up
-        if request_id in self.widget()._stream_chunks:
-            del self.widget()._stream_chunks[request_id]
+                yield chunk
+            
+            # Wait for the request to complete and check for errors
+            result = await request_task
+            # Update usage stats from result
+            self._input_usage = result.get("inputUsage", self._input_usage)
+            self._input_quota = result.get("inputQuota", self._input_quota)
+        finally:
+            # Clean up
+            if request_id in self.widget()._stream_chunks:
+                del self.widget()._stream_chunks[request_id]
+            # Clean up mapping
+            for k, v in list(self.widget()._stream_request_mapping.items()):
+                if v == request_id:
+                    del self.widget()._stream_request_mapping[k]
 
     async def append(
         self,
@@ -521,7 +540,7 @@ class LanguageModel:
             input_quota=result.get("inputQuota"),
         )
 
-    async def destroy(self) -> None:
+    async def destroy(self) -> None:   
         """Destroy the session and free resources."""
         params = {"sessionId": self.session_id}
         await self.widget().send_request("destroy", params)
