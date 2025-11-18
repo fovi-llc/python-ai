@@ -5,6 +5,7 @@ from logging import log
 import uuid
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 from functools import cache
+import time
 
 import anywidget
 import traitlets
@@ -31,8 +32,8 @@ class LanguageModelWidget(anywidget.AnyWidget):
 
         // Store sessions by ID
         const sessions = {};
+        const streamStates = new Map();
 
-        // Handle requests from Python
         model.on('change:request', () => {
             const request = model.get('request');
             if (!request || !request.id) return;
@@ -60,7 +61,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
                     model.save_changes();
                 });
         });
-
+    
         async function getParamsDict() {
             const params = (await LanguageModel.params()) ?? {
                 defaultTopK: 3,
@@ -161,19 +162,89 @@ class LanguageModelWidget(anywidget.AnyWidget):
         }
 
         async function consumeStream(stream, chunks, sessionId, requestId) {
+            const state = ensureStreamState(sessionId, requestId);
             for await (const chunk of stream) {
                 console.log('chunk: ', chunk);
                 chunks.push(chunk);
-                // Send intermediate chunks back - use timestamp to ensure uniqueness
-                model.set('stream_chunk', {
-                    sessionId: sessionId,
-                    requestId: requestId,
-                    chunk: chunk,
-                    timestamp: Date.now()
-                });
-                model.save_changes();
+                state.buffer.push(chunk);
+                flushStreamChunks(state);
             }
+            state.done = true;
+            flushStreamChunks(state);
+            finalizeStreamState(state);
+            await state.drainPromise;
         }
+
+        function getStreamKey(sessionId, requestId) {
+            return `${sessionId}:${requestId}`;
+        }
+
+        function ensureStreamState(sessionId, requestId) {
+            const key = getStreamKey(sessionId, requestId);
+            if (!streamStates.has(key)) {
+                let resolveDrain;
+                const drainPromise = new Promise(resolve => {
+                    resolveDrain = resolve;
+                });
+                streamStates.set(key, {
+                    key,
+                    sessionId,
+                    requestId,
+                    buffer: [],
+                    waitingAck: false,
+                    pendingBatchId: null,
+                    batchCounter: 0,
+                    done: false,
+                    resolved: false,
+                    resolveDrain,
+                    drainPromise,
+                });
+            }
+            return streamStates.get(key);
+        }
+
+        function flushStreamChunks(state) {
+            if (state.waitingAck || state.buffer.length === 0) return;
+            state.waitingAck = true;
+            state.pendingBatchId = `${state.requestId}-${++state.batchCounter}`;
+            const chunksToSend = state.buffer.splice(0);
+            model.set('stream_chunk', {
+                sessionId: state.sessionId,
+                requestId: state.requestId,
+                chunks: chunksToSend,
+                batchId: state.pendingBatchId,
+                timestamp: Date.now(),
+            });
+            model.save_changes();
+        }
+
+        function handleStreamChunkAck() {
+            const ack = model.get('stream_chunk_ack');
+            if (!ack || !ack.requestId || !ack.batchId) return;
+            const key = getStreamKey(ack.sessionId, ack.requestId);
+            const state = streamStates.get(key);
+            if (!state || ack.batchId !== state.pendingBatchId) return;
+            state.waitingAck = false;
+            state.pendingBatchId = null;
+            if (state.buffer.length > 0) {
+                flushStreamChunks(state);
+                return;
+            }
+            finalizeStreamState(state);
+        }
+
+        function finalizeStreamState(state) {
+            if (!(state.done && !state.waitingAck && state.buffer.length === 0)) {
+                return;
+            }
+            if (!state.resolved) {
+                state.resolved = true;
+                state.resolveDrain();
+            }
+            streamStates.delete(state.key);
+        }
+
+        model.on('change:stream_chunk_ack', handleStreamChunkAck);
 
         function appendSession(params) {
             const session = sessions[params.sessionId];
@@ -244,6 +315,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
     error = traitlets.Dict({}).tag(sync=True)
     quota_overflow_event = traitlets.Dict({}).tag(sync=True)
     stream_chunk = traitlets.Dict({}).tag(sync=True)
+    stream_chunk_ack = traitlets.Dict({}).tag(sync=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -259,16 +331,14 @@ class LanguageModelWidget(anywidget.AnyWidget):
             return
 
         request_id = response["id"]
-        
-        # Check if this is a streaming request and signal completion
-        if request_id in self._stream_request_mapping:
-            stream_request_id = self._stream_request_mapping[request_id]
-            if stream_request_id in self._stream_chunks:
-                try:
-                    self._stream_chunks[stream_request_id].put_nowait(None)
-                except:
-                    pass
-        
+
+        stream_request_id = self._stream_request_mapping.pop(request_id, None)
+        if stream_request_id and stream_request_id in self._stream_chunks:
+            try:
+                self._stream_chunks[stream_request_id].put_nowait(None)
+            except:
+                pass
+
         if request_id in self._pending_requests:
             future = self._pending_requests.pop(request_id)
             if response.get("error"):
@@ -294,20 +364,36 @@ class LanguageModelWidget(anywidget.AnyWidget):
 
     @traitlets.observe("stream_chunk")
     def _handle_stream_chunk(self, change):
-        """Handle streaming chunk from JavaScript."""
         chunk_data = change["new"]
         if not chunk_data or "requestId" not in chunk_data:
             return
 
         request_id = chunk_data["requestId"]
-        if request_id in self._stream_chunks:
-            # Put chunk into the queue without blocking
+        chunks = chunk_data.get("chunks")
+        if chunks is None:
+            single_chunk = chunk_data.get("chunk")
+            chunks = [single_chunk] if single_chunk is not None else []
+
+        queue = self._stream_chunks.get(request_id)
+        if not queue:
+            print(f"Warning: Received chunk for unknown request ID: {request_id}")
+            return
+
+        for chunk in chunks:
             try:
-                self._stream_chunks[request_id].put_nowait(chunk_data["chunk"])
+                queue.put_nowait(chunk)
             except asyncio.QueueFull:
                 print(f"Warning: Stream queue full for request {request_id}")
-        else:
-            print(f"Warning: Received chunk for unknown request ID: {request_id}")
+                break
+
+        batch_id = chunk_data.get("batchId")
+        if batch_id is not None:
+            self.stream_chunk_ack = {
+                "sessionId": chunk_data.get("sessionId"),
+                "requestId": request_id,
+                "batchId": batch_id,
+                "timestamp": time.time(),
+            }
 
     def wait_for_change(self, value):
         future = asyncio.Future()
@@ -320,10 +406,14 @@ class LanguageModelWidget(anywidget.AnyWidget):
         self.observe(getvalue, value)
         return future
 
-    async def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def send_request(
+        self,
+        method: str,
+        params: Optional[Dict[str, Any]] = None,
+        request_id: Optional[str] = None,
+    ) -> Any:
         """Send a request to JavaScript and await response."""
-        request_id = str(uuid.uuid4())
-        # print("Sending request ID: ", request_id)
+        request_id = request_id or str(uuid.uuid4())
         future = asyncio.Future()
         self._pending_requests[request_id] = future
 
@@ -425,48 +515,41 @@ class LanguageModel:
         """Prompt the language model and stream the result."""
         input_data = self._prepare_input(input)
 
-        request_id = str(uuid.uuid4())
-        # Create a queue for this streaming request BEFORE starting the request
+        stream_request_id = str(uuid.uuid4())
         queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
-        self.widget()._stream_chunks[request_id] = queue
+        self.widget()._stream_chunks[stream_request_id] = queue
 
         params = {
             "sessionId": self.session_id,
-            "requestId": request_id,
+            "requestId": stream_request_id,
             "input": input_data,
             "options": options,
         }
 
-        # Start the request - capture the main request ID for mapping
+        main_request_id = str(uuid.uuid4())
+        self.widget()._stream_request_mapping[main_request_id] = stream_request_id
+
         async def _send():
-            main_request_id = str(uuid.uuid4())
-            self.widget()._stream_request_mapping[main_request_id] = request_id
-            return await self.widget().send_request("promptStreaming", params)
-        
+            return await self.widget().send_request(
+                "promptStreaming", params, request_id=main_request_id
+            )
+
         request_task = asyncio.create_task(_send())
 
         try:
-            # Yield chunks as they arrive
             while True:
                 chunk = await queue.get()
                 if chunk is None:
-                    # Stream completed
                     break
                 yield chunk
-            
-            # Wait for the request to complete and check for errors
+
             result = await request_task
-            # Update usage stats from result
             self._input_usage = result.get("inputUsage", self._input_usage)
             self._input_quota = result.get("inputQuota", self._input_quota)
         finally:
-            # Clean up
-            if request_id in self.widget()._stream_chunks:
-                del self.widget()._stream_chunks[request_id]
-            # Clean up mapping
-            for k, v in list(self.widget()._stream_request_mapping.items()):
-                if v == request_id:
-                    del self.widget()._stream_request_mapping[k]
+            self.widget()._stream_chunks.pop(stream_request_id, None)
+            self.widget()._stream_request_mapping.pop(main_request_id, None)
+
 
     async def append(
         self,
