@@ -8,16 +8,6 @@ from functools import cache
 import anywidget
 import traitlets
 
-from .models import (
-    Availability,
-    LanguageModelAppendOptions,
-    LanguageModelCloneOptions,
-    LanguageModelCreateOptions,
-    LanguageModelMessage,
-    LanguageModelParams,
-    LanguageModelPromptOptions,
-)
-
 
 class LanguageModelWidget(anywidget.AnyWidget):
     """AnyWidget bridge to Chrome's Prompt API."""
@@ -48,7 +38,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
 
             handleRequest(request)
                 .then(result => {
-                    console.log('Result: ', result);
+                    // console.log('Result: ', result);
                     model.set('response', {
                         id: request.id,
                         result: result,
@@ -57,7 +47,7 @@ class LanguageModelWidget(anywidget.AnyWidget):
                     model.save_changes();
                 })
                 .catch(error => {
-                    console.error('Error: ', error);
+                    // console.error('Error: ', error);
                     model.set('response', {
                         id: request.id,
                         result: null,
@@ -369,46 +359,27 @@ class LanguageModel:
 
     @classmethod
     async def availability(
-        cls, options: Optional[Union[LanguageModelCreateOptions, Dict[str, Any]]] = None
+        cls, options: dict[str, Any] = {}
     ) -> Optional[List[str]]:
         """Check availability of the language model with given options."""
-        if isinstance(options, LanguageModelCreateOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
-
-        return await cls.widget().send_request("availability", {"options": options_dict})
+        return await cls.widget().send_request("availability", {"options": options})
 
 
     @classmethod
-    async def params(cls) -> Optional[LanguageModelParams]:
+    async def params(cls) -> Optional[dict[str, Any]]:
         """Get language model parameters."""
-        result = await cls.widget().send_request("params")
-
-        if result is None:
-            return None
-
-        return LanguageModelParams.from_dict(result)
+        return await cls.widget().send_request("params")
 
     @classmethod
     async def create(
-        cls, options: Optional[Union[LanguageModelCreateOptions, Dict[str, Any]]] = None
+        cls, options: dict[str, Any] = {}
     ) -> "LanguageModel":
         """Create a new language model session."""
         session_id = str(uuid.uuid4())
 
-        if isinstance(options, LanguageModelCreateOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
+        params = {"sessionId": session_id, "options": options}
 
-        params = {"sessionId": session_id, "options": options_dict}
         result = await cls.widget().send_request("create", params)
-        # print("Created session result: ", result)
 
         return cls(
             session_id=session_id,
@@ -420,20 +391,13 @@ class LanguageModel:
 
     async def prompt(
         self,
-        input: Union[str, List[LanguageModelMessage], List[Dict[str, Any]]],
-        options: Optional[Union[LanguageModelPromptOptions, Dict[str, Any]]] = None,
+        input: Union[str, list[dict[str, Any]]],
+        options: Optional[dict[str, Any]] = {},
     ) -> str:
         """Prompt the language model and return the result."""
         input_data = self._prepare_input(input)
 
-        if isinstance(options, LanguageModelPromptOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
-
-        params = {"sessionId": self.session_id, "input": input_data, "options": options_dict}
+        params = {"sessionId": self.session_id, "input": input_data, "options": options}
         result = await self.widget().send_request("prompt", params)
 
         self._input_usage = result.get("inputUsage", self._input_usage)
@@ -443,18 +407,11 @@ class LanguageModel:
 
     async def prompt_streaming(
         self,
-        input: Union[str, List[LanguageModelMessage], List[Dict[str, Any]]],
-        options: Optional[Union[LanguageModelPromptOptions, Dict[str, Any]]] = None,
+        input: Union[str, list[dict[str, Any]]],
+        options: Optional[dict[str, Any]] = {},
     ) -> AsyncIterator[str]:
         """Prompt the language model and stream the result."""
         input_data = self._prepare_input(input)
-
-        if isinstance(options, LanguageModelPromptOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
 
         request_id = str(uuid.uuid4())
         self.widget()._stream_chunks[request_id] = []
@@ -463,7 +420,7 @@ class LanguageModel:
             "sessionId": self.session_id,
             "requestId": request_id,
             "input": input_data,
-            "options": options_dict,
+            "options": options,
         }
 
         # Start the request
@@ -493,20 +450,13 @@ class LanguageModel:
 
     async def append(
         self,
-        input: Union[str, List[LanguageModelMessage], List[Dict[str, Any]]],
-        options: Optional[Union[LanguageModelAppendOptions, Dict[str, Any]]] = None,
+        input: Union[str, list[dict[str, Any]]],
+        options: Optional[dict[str, Any]] = {},
     ) -> None:
         """Append messages to the session without prompting for a response."""
         input_data = self._prepare_input(input)
 
-        if isinstance(options, LanguageModelAppendOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
-
-        params = {"sessionId": self.session_id, "input": input_data, "options": options_dict}
+        params = {"sessionId": self.session_id, "input": input_data, "options": options}
         result = await self.widget().send_request("append", params)
 
         self._input_usage = result.get("inputUsage", self._input_usage)
@@ -514,20 +464,13 @@ class LanguageModel:
 
     async def measure_input_usage(
         self,
-        input: Union[str, List[LanguageModelMessage], List[Dict[str, Any]]],
-        options: Optional[Union[LanguageModelPromptOptions, Dict[str, Any]]] = None,
+        input: Union[str, list[dict[str, Any]]],
+        options: Optional[dict[str, Any]] = {},
     ) -> float:
         """Measure how many tokens an input will consume."""
         input_data = self._prepare_input(input)
 
-        if isinstance(options, LanguageModelPromptOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
-
-        params = {"sessionId": self.session_id, "input": input_data, "options": options_dict}
+        params = {"sessionId": self.session_id, "input": input_data, "options": options}
         result = await self.widget().send_request("measureInputUsage", params)
 
         return result["usage"]
@@ -558,22 +501,15 @@ class LanguageModel:
         return self._temperature
 
     async def clone(
-        self, options: Optional[Union[LanguageModelCloneOptions, Dict[str, Any]]] = None
+        self, options: dict[str, Any] = {}
     ) -> "LanguageModel":
         """Clone the current session."""
         new_session_id = str(uuid.uuid4())
 
-        if isinstance(options, LanguageModelCloneOptions):
-            options_dict = options.to_dict()
-        elif options is None:
-            options_dict = {}
-        else:
-            options_dict = options
-
         params = {
             "sessionId": self.session_id,
             "newSessionId": new_session_id,
-            "options": options_dict,
+            "options": options,
         }
         result = await self.widget().send_request("clone", params)
         return LanguageModel(
@@ -590,17 +526,15 @@ class LanguageModel:
         await self.widget().send_request("destroy", params)
 
     def _prepare_input(
-        self, input: Union[str, List[LanguageModelMessage], List[Dict[str, Any]]]
-    ) -> Union[str, List[Dict[str, Any]]]:
+        self, input: Union[str, list[dict[str, Any]]]
+    ) -> Union[str, list[dict[str, Any]]]:
         """Prepare input for sending to JavaScript."""
         if isinstance(input, str):
             return input
         elif isinstance(input, list):
             result = []
             for item in input:
-                if isinstance(item, LanguageModelMessage):
-                    result.append(item.to_dict())
-                elif isinstance(item, dict):
+                if isinstance(item, dict):
                     result.append(item)
                 else:
                     raise TypeError(f"Invalid input item type: {type(item)}")
